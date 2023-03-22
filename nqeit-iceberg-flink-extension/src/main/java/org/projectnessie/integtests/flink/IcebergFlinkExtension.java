@@ -45,6 +45,7 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.iceberg.CatalogProperties;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ExtensionContext.Store.CloseableResource;
 import org.junit.jupiter.api.extension.ParameterContext;
@@ -113,8 +114,13 @@ public class IcebergFlinkExtension implements ParameterResolver {
       this.flinkHolder = FlinkHolder.get(extensionContext);
 
       NessieEnv env = NessieEnv.get(extensionContext);
-      catalogName =
-          String.format("NesQuEIT_%s_%d", env.getStartedDateTimeString(), env.getStartedNanos());
+
+      /*
+      if (System.getProperty("dremio.catalog-name") != null) {
+        catalogName = System.getProperty("dremio.catalog-name").replace('-', '_');
+      }
+      */
+      catalogName = String.format("NesQuEIT_%s_%d", env.getStartedDateTimeString(), env.getStartedNanos());
 
       Map<String, String> config = new HashMap<>();
       config.put("type", "iceberg");
@@ -172,8 +178,13 @@ public class IcebergFlinkExtension implements ParameterResolver {
 
     @FormatMethod
     @Override
-    public TableResult exec(TableEnvironment env, String query, Object... args) {
-      return env.executeSql(String.format(query, args));
+    public TableResult exec(@NotNull TableEnvironment env, String query, Object... args) {
+      String fullQuery = String.format(query, args);
+      try {
+        return env.executeSql(fullQuery);
+      } catch (Exception e) {
+        throw new RuntimeException("Flink failed to exec query: " + fullQuery, e);
+      }
     }
 
     @FormatMethod
